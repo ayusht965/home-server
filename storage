@@ -1,0 +1,10 @@
+IOMMU enabling
+  nano /etc/default/grub
+      GRUB_CMDLINE_LINUX_DEFAULT="quiet" => "quite intel_iommu=on"   [for pci pass through]
+  update-grub
+  
+  Now check to make sure everything is enabled.
+    dmesg | grep -e DMAR -e IOMMU
+    dmesg | grep 'remapping'
+
+CREATE ZFS storage under Node(pve) -> Disks -> ZFS and use the HDD for this.
