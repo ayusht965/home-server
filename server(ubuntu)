@@ -1,70 +1,355 @@
-UPDATE THE SERVER
+# Ubuntu Server Setup & Samba File Sharing
 
-  apt update
-  apt upgrade
+## 1. Update the Server
 
-ADD NEW USER
-  adduser {name}  [set the login password]
-  adduser {name} sudo
-  su {name} 
-  
-  Authorize user
-  sudo chown -R ayush:ayush /data   
-  sudo chown -R ayush:ayush /docker
+First, update the package lists and upgrade installed packages:
 
-SHARING THE MOUNT POINTS CREATED ABOVE(using Samba)
-  sudo apt install samba
-  cd /etc/samba
-  sudo mv smb.conf smb.conf.old  [Create a backup of the default configuration]
+```bash
+sudo apt update
+sudo apt upgrade -y
+```
 
-  sudo nano smb.conf
-      [global]
-         server string = server
-         workgroup = WORKGROUP
-         security = user
-         map to guest = Bad User
-         name resolve order = bcast host
-         hosts allow = 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12 [depending on your local ip]
-         hosts deny = 0.0.0.0/0
+---
 
-      [data]
-         path = /data
-         force user = ayush
-         force group = ayush
-         create mask = 0774
-         force create mode = 0774
-         directory mask = 0775
-         force directory mode = 0775
-         browseable = yes
-         writable = yes
-         read only = no
-         guest ok = no
+# 2. Create a New User
 
-      [docker]
-         path = /docker
-         force user = ayush
-         force group = ayush
-         create mask = 0774
-         force create mode = 0774
-         directory mask = 0775
-         force directory mode = 0775
-         browseable = yes
-         writable = yes
-         read only = no
-         guest ok = no
+Create a new user:
 
-  sudo smbpasswd -a {name} [set up the password to access across the home network]
+```bash
+sudo adduser <name>
+```
 
-  Set services to auto-start on reboot
-  
-    sudo systemctl enable smbd
-    sudo systemctl enable nmbd
-    sudo systemctl restart smbd
-    sudo systemctl restart nmbd
+You will be prompted to set a login password and other optional information.
 
-TO ACCESS IT ON WINDOWS, INSTALL THESE ON THE SERVER
-  sudo apt install wsdd
-  sudo systemctl enable wsdd
-  sudo systemctl start wsdd
-    
+Add the user to the `sudo` group:
+
+```bash
+sudo adduser <name> sudo
+```
+
+Switch to the newly created user:
+
+```bash
+su - <name>
+```
+
+---
+
+# 3. Give the User Ownership of the Storage
+
+If `/data` and `/docker` are the mount points created earlier, give the new user ownership of these directories.
+
+For example, for user `ayush`:
+
+```bash
+sudo chown -R ayush:ayush /data
+sudo chown -R ayush:ayush /docker
+```
+
+Verify the ownership:
+
+```bash
+ls -ld /data
+ls -ld /docker
+```
+
+---
+
+# 4. Install Samba
+
+Samba allows the Linux server to share files and folders with other devices on the local network.
+
+Install Samba:
+
+```bash
+sudo apt install samba -y
+```
+
+---
+
+# 5. Backup the Default Samba Configuration
+
+Navigate to the Samba configuration directory:
+
+```bash
+cd /etc/samba
+```
+
+Create a backup of the default configuration:
+
+```bash
+sudo mv smb.conf smb.conf.old
+```
+
+This allows you to restore the original configuration if needed.
+
+---
+
+# 6. Configure Samba
+
+Create a new Samba configuration file:
+
+```bash
+sudo nano /etc/samba/smb.conf
+```
+
+Add the following configuration:
+
+```ini
+[global]
+   server string = server
+   workgroup = WORKGROUP
+   security = user
+   map to guest = Bad User
+   name resolve order = bcast host
+
+   # Allow clients from private/local networks
+   hosts allow = 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12
+   hosts deny = 0.0.0.0/0
+
+
+[data]
+   path = /data
+   force user = ayush
+   force group = ayush
+
+   create mask = 0774
+   force create mode = 0774
+   directory mask = 0775
+   force directory mode = 0775
+
+   browseable = yes
+   writable = yes
+   read only = no
+   guest ok = no
+
+
+[docker]
+   path = /docker
+   force user = ayush
+   force group = ayush
+
+   create mask = 0774
+   force create mode = 0774
+   directory mask = 0775
+   force directory mode = 0775
+
+   browseable = yes
+   writable = yes
+   read only = no
+   guest ok = no
+```
+
+### Network configuration
+
+The `hosts allow` setting allows clients from private IP ranges:
+
+* `192.168.0.0/16`
+* `10.0.0.0/8`
+* `172.16.0.0/12`
+
+You can restrict this further to your actual home network.
+
+For example, if your router uses `192.168.1.x`, you could use:
+
+```ini
+hosts allow = 192.168.1.0/24
+```
+
+This is generally preferable for a home server because it only allows devices on your local subnet.
+
+---
+
+# 7. Add the Samba User
+
+The Linux user and Samba user are managed separately.
+
+Add the user to Samba:
+
+```bash
+sudo smbpasswd -a <name>
+```
+
+Set the password when prompted.
+
+> **Important:** This password is used when accessing the Samba share from Windows. It does not have to be the same as the Linux login password.
+
+Enable the Samba user:
+
+```bash
+sudo smbpasswd -e <name>
+```
+
+---
+
+# 8. Test the Samba Configuration
+
+Before restarting Samba, check the configuration for syntax errors:
+
+```bash
+sudo testparm
+```
+
+If the configuration is valid, you should see:
+
+```text
+Loaded services file OK.
+```
+
+---
+
+# 9. Enable Samba Services
+
+Enable Samba services so they automatically start after a reboot:
+
+```bash
+sudo systemctl enable smbd
+sudo systemctl enable nmbd
+```
+
+Restart the services:
+
+```bash
+sudo systemctl restart smbd
+sudo systemctl restart nmbd
+```
+
+Check their status:
+
+```bash
+sudo systemctl status smbd
+sudo systemctl status nmbd
+```
+
+---
+
+# 10. Install WSDD for Windows Network Discovery
+
+`wsdd` helps Windows discover the Linux/Samba server under **Network** in File Explorer.
+
+Install it:
+
+```bash
+sudo apt install wsdd -y
+```
+
+Enable it at boot:
+
+```bash
+sudo systemctl enable wsdd
+```
+
+Start the service:
+
+```bash
+sudo systemctl start wsdd
+```
+
+Check its status:
+
+```bash
+sudo systemctl status wsdd
+```
+
+---
+
+# 11. Access the Shares from Windows
+
+On a Windows machine connected to the same network, open **File Explorer**.
+
+You can access the server directly using its IP address:
+
+```text
+\\SERVER_IP\data
+```
+
+For example:
+
+```text
+\\192.168.1.100\data
+```
+
+The Docker share can be accessed using:
+
+```text
+\\SERVER_IP\docker
+```
+
+Alternatively, if WSDD and network discovery are working, the server should appear under:
+
+**File Explorer → Network**
+
+---
+
+# 12. Useful Troubleshooting Commands
+
+### Check Samba configuration
+
+```bash
+sudo testparm
+```
+
+### Check Samba service
+
+```bash
+sudo systemctl status smbd
+```
+
+### Check WSDD
+
+```bash
+sudo systemctl status wsdd
+```
+
+### Check listening ports
+
+```bash
+sudo ss -tulpn | grep -E '139|445|3702'
+```
+
+### Check the server's IP address
+
+```bash
+ip addr
+```
+
+or:
+
+```bash
+hostname -I
+```
+
+### List available Samba shares locally
+
+```bash
+smbclient -L localhost -U <name>
+```
+
+---
+
+## Final Setup
+
+After completing these steps, the server will have:
+
+```text
+Ubuntu Server
+│
+├── /data
+│   └── Shared through Samba
+│
+├── /docker
+│   └── Shared through Samba
+│
+├── Samba (smbd)
+│   └── File sharing
+│
+├── NetBIOS (nmbd)
+│   └── Network discovery/support
+│
+└── WSDD
+    └── Windows Network discovery
+```
+
+You can then use the `/data` and `/docker` directories as network-accessible storage from Windows devices on your home network.
+
   
