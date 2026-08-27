@@ -1,10 +1,83 @@
-IOMMU enabling
-  nano /etc/default/grub
-      GRUB_CMDLINE_LINUX_DEFAULT="quiet" => "quite intel_iommu=on"   [for pci pass through]
-  update-grub
-  
-  Now check to make sure everything is enabled.
-    dmesg | grep -e DMAR -e IOMMU
-    dmesg | grep 'remapping'
+# Proxmox IOMMU & ZFS Storage Setup
 
-CREATE ZFS storage under Node(pve) -> Disks -> ZFS and use the HDD for this.
+## 1. Enable IOMMU
+
+IOMMU is required for features such as **PCI passthrough**.
+
+### Edit GRUB configuration
+
+Open the GRUB configuration file:
+
+```bash
+nano /etc/default/grub
+```
+
+Find:
+
+```bash
+GRUB_CMDLINE_LINUX_DEFAULT="quiet"
+```
+
+For an Intel CPU, change it to:
+
+```bash
+GRUB_CMDLINE_LINUX_DEFAULT="quiet intel_iommu=on"
+```
+
+> **Note:** For AMD CPUs, use `amd_iommu=on` instead.
+
+Save the file and update GRUB:
+
+```bash
+update-grub
+```
+
+Reboot the Proxmox host:
+
+```bash
+reboot
+```
+
+---
+
+## 2. Verify IOMMU
+
+After rebooting, check whether IOMMU is enabled.
+
+### Check DMAR / IOMMU
+
+```bash
+dmesg | grep -e DMAR -e IOMMU
+```
+
+You should see output indicating that IOMMU/DMAR has been enabled.
+
+### Check interrupt remapping
+
+```bash
+dmesg | grep 'remapping'
+```
+
+If the commands return relevant IOMMU/DMAR and remapping messages, the configuration is working.
+
+---
+
+# 3. Create ZFS Storage Using the HDD
+
+Use the HDD as a dedicated ZFS storage pool in Proxmox.
+
+Navigate to:
+
+**Proxmox Node (`pve`) → Disks → ZFS**
+
+From there:
+
+1. Select **Create: ZFS**.
+2. Select the HDD you want to use.
+3. Give the ZFS pool a suitable name.
+4. Create the ZFS pool.
+
+> **Warning:** Creating a ZFS pool may erase existing data on the selected disk. Make sure the HDD does not contain anything you need before creating the pool.
+
+The HDD can then be used as storage for VMs, containers, backups, or other data.
+
