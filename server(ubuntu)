@@ -1,0 +1,70 @@
+UPDATE THE SERVER
+
+  apt update
+  apt upgrade
+
+ADD NEW USER
+  adduser {name}  [set the login password]
+  adduser {name} sudo
+  su {name} 
+  
+  Authorize user
+  sudo chown -R ayush:ayush /data   
+  sudo chown -R ayush:ayush /docker
+
+SHARING THE MOUNT POINTS CREATED ABOVE(using Samba)
+  sudo apt install samba
+  cd /etc/samba
+  sudo mv smb.conf smb.conf.old  [Create a backup of the default configuration]
+
+  sudo nano smb.conf
+      [global]
+         server string = server
+         workgroup = WORKGROUP
+         security = user
+         map to guest = Bad User
+         name resolve order = bcast host
+         hosts allow = 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12 [depending on your local ip]
+         hosts deny = 0.0.0.0/0
+
+      [data]
+         path = /data
+         force user = ayush
+         force group = ayush
+         create mask = 0774
+         force create mode = 0774
+         directory mask = 0775
+         force directory mode = 0775
+         browseable = yes
+         writable = yes
+         read only = no
+         guest ok = no
+
+      [docker]
+         path = /docker
+         force user = ayush
+         force group = ayush
+         create mask = 0774
+         force create mode = 0774
+         directory mask = 0775
+         force directory mode = 0775
+         browseable = yes
+         writable = yes
+         read only = no
+         guest ok = no
+
+  sudo smbpasswd -a {name} [set up the password to access across the home network]
+
+  Set services to auto-start on reboot
+  
+    sudo systemctl enable smbd
+    sudo systemctl enable nmbd
+    sudo systemctl restart smbd
+    sudo systemctl restart nmbd
+
+TO ACCESS IT ON WINDOWS, INSTALL THESE ON THE SERVER
+  sudo apt install wsdd
+  sudo systemctl enable wsdd
+  sudo systemctl start wsdd
+    
+  
